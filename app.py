@@ -4,20 +4,20 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
-# --- ANALİZ YAPILANDIRMASI ---
-st.set_page_config(page_title="Geopolitical War Room", layout="wide")
-st.title("🏛️ Küresel Hegemonya ve Savaş Olasılığı Analizörü (V2.1)")
+# --- KONSEY ANALİZ YAPILANDIRMASI ---
+st.set_page_config(page_title="Geopolitical War Room V2.2", layout="wide")
+st.title("🏛️ Küresel Hegemonya ve Sistemik Risk Analizörü (V2.2)")
 
-# --- VERİ ÇEKME FONKSİYONU ---
+# --- 1. VERİ MERKEZİ ---
 @st.cache_data(ttl=3600)
 def fetch_geopolitical_proxies():
     tickers = {
         "DXY": "DX-Y.NYB",       # Hegemon Gücü
         "VIX": "^VIX",            # Sistemik Korku
-        "BRENT": "BZ=F",          # Enerji Darboğazı
+        "BRENT": "BZ=F",          # Enerji Darboğazı (Hürmüz Proxy)
         "GOLD": "GC=F",           # Güvenli Liman
-        "SPY": "SPY",             # Batı Sermaye Gücü
-        "EEM": "EEM"              # Gelişen Piyasalar (Doğu Bloku Proxy)
+        "LMT": "LMT",             # Savunma Sanayii (Savaş Beklentisi)
+        "BDRY": "BDRY"            # Tedarik Zinciri (Navlun/Lojistik Proxy)
     }
     data = {}
     for name, t in tickers.items():
@@ -32,62 +32,74 @@ def fetch_geopolitical_proxies():
 
 geo_data = fetch_geopolitical_proxies()
 
-# --- 1. SAVAŞ OLASILIĞI ALGORİTMASI (CPA) ---
-st.header("⚔️ Savaş Olasılığı ve Sistemik Risk Modeli")
+# --- 2. GELİŞMİŞ PARAMETRE GİRİŞLERİ (MANUEL + PROXY) ---
+st.sidebar.header("🕹️ Stratejik Parametreler")
 
-# Ağırlıklı Risk Katsayıları
-w_oil = 0.35
-w_gold = 0.30
-w_vix = 0.20
-w_dxy = 0.15
+# Nükleer Caydırıcılık (Deterrence Factor)
+# 1: Düşük Caydırıcılık (Riskli), 5: Yüksek Caydırıcılık (Stabil)
+deterrence = st.sidebar.slider("Nükleer Caydırıcılık Seviyesi (M.A.D.)", 1.0, 5.0, 3.5)
+st.sidebar.caption("Yüksek değer, nükleer eşiğin çatışmayı frenlediğini simgeler.")
 
-# Olasılık Hesaplama (Normalize Edilmiş Skor)
-raw_score = (geo_data["BRENT"]["volatility"] * w_oil) + \
-            (geo_data["GOLD"]["volatility"] * w_gold) + \
-            (geo_data["VIX"]["last"] / 50 * w_vix) + \
-            (abs(geo_data["DXY"]["change"]) * w_dxy)
+# Tedarik Zinciri Kırılganlığı (Supply Chain Fragility)
+supply_fragility = geo_data["BDRY"]["volatility"] * 2 
 
-war_probability = min(raw_score * 10, 99.9) # 0-100 arası ölçeklendirme
+# --- 3. SAVAŞ OLASILIĞI ALGORİTMASI (V2.2) ---
+st.header("⚔️ Gelişmiş Savaş Olasılığı ve Çöküş Modeli")
+
+# Ağırlıklar
+w_oil = 0.30
+w_gold = 0.25
+w_supply = 0.25
+w_defense = 0.20
+
+# Ham Risk Skoru
+raw_risk = (geo_data["BRENT"]["volatility"] * w_oil) + \
+           (geo_data["GOLD"]["volatility"] * w_gold) + \
+           (supply_fragility * w_supply) + \
+           (geo_data["LMT"]["volatility"] * w_defense)
+
+# Caydırıcılık Filtresi ve VIX Çarpanı
+# Formül: (Risk / Caydırıcılık) * Log(VIX)
+cpi_score = (raw_risk / deterrence) * np.log1p(geo_data["VIX"]["last"])
+war_probability = min(cpi_score * 5, 99.9)
 
 col1, col2 = st.columns([1, 2])
 
 with col1:
-    st.metric("Savaş Olasılığı Endeksi (CPI)", f"%{war_probability:.2f}")
-    if war_probability > 70:
-        st.error("KRİTİK: Büyük güç çatışması eşiği (Kinetic Conflict Threshold) aşıldı.")
-    elif war_probability > 40:
-        st.warning("ALARM: Hibrit savaş ve vekalet çatışmaları yoğunlaşıyor.")
+    st.metric("Savaş Olasılığı (CPI)", f"%{war_probability:.2f}")
+    st.write(f"**Nükleer Frenleme:** {deterrence}x")
+    st.write(f"**Tedarik Zinciri Baskısı:** {supply_fragility:.2f}")
+    
+    if war_probability > 75:
+        st.error("KRİTİK: Sistemik çöküş ve topyekün çatışma riski.")
+    elif war_probability > 45:
+        st.warning("YÜKSEK: Yapısal kırılmalar ve bölgesel savaşlar.")
     else:
-        st.success("STABİL: Hegemonik denge korunuyor.")
+        st.success("DÜŞÜK: Hegemonik istikrar ve caydırıcılık aktif.")
 
 with col2:
-    # Gösterge Paneli
     fig = go.Figure(go.Indicator(
         mode = "gauge+number",
         value = war_probability,
-        domain = {'x': [0, 1], 'y': [0, 1]},
-        title = {'text': "Conflict Probability Score"},
+        title = {'text': "Conflict & Collapse Probability"},
         gauge = {
             'axis': {'range': [None, 100]},
+            'bar': {'color': "darkred"},
             'steps' : [
-                {'range': [0, 30], 'color': "green"},
-                {'range': [30, 60], 'color': "yellow"},
-                {'range': [60, 100], 'color': "red"}]}))
+                {'range': [0, 40], 'color': "lightgreen"},
+                {'range': [40, 70], 'color': "orange"},
+                {'range': [70, 100], 'color': "red"}]}))
     st.plotly_chart(fig, use_container_width=True)
 
-# --- 2. HEGEMONYA NABZI (BATI VS DOĞU) ---
+# --- 4. SİSTEMİK İZLEME PANELİ ---
 st.divider()
-st.subheader("📡 Güç Dengesi ve Kutuplaşma (Western vs. Emerging)")
-col3, col4, col5 = st.columns(3)
+st.subheader("📡 Yapısal Kırılganlık Göstergeleri")
+c3, c4, c5 = st.columns(3)
 
-# Batı (SPY) vs Gelişen (EEM) Rasyosu
-relative_strength = geo_data["SPY"]["last"] / geo_data["EEM"]["last"]
-col3.metric("Hegemonik Üstünlük Rasyosu", f"{relative_strength:.2f}")
-col3.caption("Artış: ABD Hegemonyası güçleniyor. Azalış: Çok kutupluluk artıyor.")
+c3.metric("Navlun Volatilitesi (BDRY)", f"{geo_data['BDRY']['volatility']:.2f}%")
+c4.metric("Savunma Primi (LMT)", f"{geo_data['LMT']['last']:.2f}$", f"{geo_data['LMT']['change']:.2f}%")
+c5.metric("Hegemon Gücü (DXY)", f"{geo_data['DXY']['last']:.2f}")
 
-col4.metric("Doların Zırh Gücü (DXY)", f"{geo_data['DXY']['last']:.2f}", f"{geo_data['DXY']['change']:.2f}%")
-col5.metric("Enerji Silahı (Brent)", f"{geo_data['BRENT']['last']:.2f}$", f"{geo_data['BRENT']['change']:.2f}%")
-
-# --- 3. ANALİTİK BÜLTEN ---
-st.info(f"🛡️ **Konsey Analizi:** Altın volatilitesindeki artış ({geo_data['GOLD']['volatility']:.2f}), merkez bankalarının kağıt varlıklardan kaçışını simgeler. "
-        "DXY'nin 105 üzerindeki her hareketi, küresel ticaret üzerinde 'Finansal Borç Sıkışması' yaratarak jeopolitik tansiyonu besler.")
+st.info("🛡️ **Konsey Analizi:** Nükleer caydırıcılık, büyük güçler arasındaki doğrudan kinetik teması engellerken; "
+        "tedarik zinciri kırılganlığı 'ekonomik boğulma' riskini ölçer. Navlun (BDRY) fiyatlarındaki aşırı volatilite, "
+        "darboğazlardaki fiziksel tıkanıklığın en rasyonel öncü göstergesidir.")
